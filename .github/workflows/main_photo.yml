@@ -15,25 +15,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js version
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20.x'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Next.js app
         run: npm run build
 
-      - name: Export static files (optional for static export)
-        run: npm run export || echo "Skipping export"
-
-      - name: Zip artifact for deployment
+      - name: Prepare deployment folder
         run: |
-          mkdir deploy
-          cp -r .next public package.json next.config.js deploy/
-          cd deploy && zip -r ../release.zip . && cd ..
+          mkdir -p deploy
+          cp -r .next public package.json deploy/
+          [ -f next.config.js ] && cp next.config.js deploy/
+          cp -r node_modules deploy/
+
+      - name: Zip deployment package
+        run: cd deploy && zip -r ../release.zip . && cd ..
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -57,7 +58,7 @@ jobs:
         with:
           name: nextjs-app
 
-      - name: Unzip artifact for deployment
+      - name: Unzip deployment package
         run: unzip release.zip -d .
 
       - name: Login to Azure
@@ -67,7 +68,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: 'Deploy to Azure Web App'
+      - name: Deploy to Azure Web App
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
